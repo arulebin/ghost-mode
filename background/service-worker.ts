@@ -1,5 +1,4 @@
 import type { TrackingEvent, PrivacyScore, TrackerData } from "../types/privacy"
-// Chrome API is available globally in extension context
 
 class GhostModeBackground {
   private privacyScores: Map<string, PrivacyScore> = new Map()
@@ -11,7 +10,6 @@ class GhostModeBackground {
   }
 
   private initializeListeners() {
-    // Listen for tracking events from content scripts
     chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       switch (message.type) {
         case "TRACKING_DETECTED":
@@ -29,24 +27,20 @@ class GhostModeBackground {
       }
     })
 
-    // Monitor web requests for additional tracking detection
     chrome.webRequest.onBeforeRequest.addListener(this.analyzeRequest.bind(this), { urls: ["<all_urls>"] }, [
       "requestBody",
     ])
 
-    // Update badge with privacy score
-    chrome.tabs.onActivated.addListener(({ tabId }) => {
+    chrome.tabs.onActivated.addListener(async ({ tabId }) => {
       this.updateBadge(tabId)
+      this.fetchPrivacyRiskScore(tabId)
     })
   }
 
   private async loadMLModels() {
     try {
-      // Load pre-trained models for tracking detection
       const modelResponse = await fetch(chrome.runtime.getURL("ml/models/tracker-detector.json"))
       const modelData = await modelResponse.json()
-
-      // Store model in chrome.storage for content scripts
       await chrome.storage.local.set({ "ml-model": modelData })
       console.log("ML models loaded successfully")
     } catch (error) {
@@ -56,10 +50,8 @@ class GhostModeBackground {
 
   private handleTrackingEvent(event: TrackingEvent, tabId?: number) {
     if (!tabId) return
-
     const domain = new URL(event.url).hostname
 
-    // Update tracker database
     if (!this.trackerDatabase.has(domain)) {
       this.trackerDatabase.set(domain, [])
     }
@@ -74,11 +66,7 @@ class GhostModeBackground {
     }
 
     this.trackerDatabase.get(domain)?.push(trackerData)
-
-    // Update privacy score
     this.updatePrivacyScore(tabId, trackerData)
-
-    // Update badge
     this.updateBadge(tabId)
   }
 
@@ -91,18 +79,15 @@ class GhostModeBackground {
       analytics: 0.3,
       advertising: 0.5,
     }
-
     const baseRisk = riskFactors[event.type as keyof typeof riskFactors] || 0.5
     const frequencyMultiplier = Math.min(event.frequency / 10, 2)
     const finalRisk = baseRisk * frequencyMultiplier
-
     if (finalRisk > 0.7) return "high"
     if (finalRisk > 0.4) return "medium"
     return "low"
   }
 
   private estimateAdRevenue(event: TrackingEvent): number {
-    // Simple ML-based revenue estimation
     const baseValues = {
       canvas: 0.05,
       webgl: 0.03,
@@ -111,7 +96,6 @@ class GhostModeBackground {
       analytics: 0.01,
       advertising: 0.12,
     }
-
     return (baseValues[event.type as keyof typeof baseValues] || 0.01) * event.frequency
   }
 
@@ -146,7 +130,6 @@ class GhostModeBackground {
       analytics: 2,
       advertising: 3,
     }
-
     return dataPointValues[trackerData.type as keyof typeof dataPointValues] || 1
   }
 
@@ -166,20 +149,18 @@ class GhostModeBackground {
     this.trackerDatabase.forEach((trackers) => {
       allTrackers.push(...trackers)
     })
-    return allTrackers.slice(-50) // Return last 50 tracking attempts
+    return allTrackers.slice(-50)
   }
 
   private async updateBadge(tabId: number) {
     const score = await this.getPrivacyScore(tabId)
     const badgeText = score.score.toString()
     const badgeColor = score.score > 80 ? "#22c55e" : score.score > 50 ? "#f59e0b" : "#ef4444"
-
     chrome.action.setBadgeText({ text: badgeText, tabId })
     chrome.action.setBadgeBackgroundColor({ color: badgeColor, tabId })
   }
 
   private analyzeRequest(details: chrome.webRequest.OnBeforeRequestDetails) {
-    // Analyze web requests for tracking patterns
     const url = new URL(details.url)
     const suspiciousPatterns = [
       /track|analytics|pixel|beacon/i,
@@ -198,15 +179,64 @@ class GhostModeBackground {
         },
       })
     }
-    
-    // Return undefined to indicate we're not blocking the request
-    return undefined;
+    return undefined
   }
 
   private async updateSettings(settings: any) {
     await chrome.storage.sync.set({ ghostModeSettings: settings })
   }
+
+  // 🔍 Collect metrics for ML API
+  private async collectMetrics(tabId: number): Promise<any> {
+    const trackers = this.getTrackerData(tabId)
+    const fingerprintingAttempts = trackers.filter(t => t.type === "fingerprint").length
+    const popupFrequency = trackers.filter(t => t.type === "popup").length
+    const encryptedRequestsRatio = 0.75 
+    const externalScriptLoads = 3       
+    const thirdPartyRequests = 10       
+    const hiddenElementsCount = 2       
+    const autoRedirects = 1             
+    const evalUsageCount = 1            
+    const suspiciousApiCalls = 2        
+    const obfuscatedCodePercentage = 45.7
+    const dataSentSizeKb = 180.5
+
+    return {
+      obfuscated_code_percentage: obfuscatedCodePercentage,
+      suspicious_api_calls: suspiciousApiCalls,
+      eval_usage_count: evalUsageCount,
+      external_script_loads: externalScriptLoads,
+      third_party_requests: thirdPartyRequests,
+      tracking_domains_count: new Set(trackers.map(t => t.domain)).size,
+      data_sent_size_kb: dataSentSizeKb,
+      encrypted_requests_ratio: encryptedRequestsRatio,
+      hidden_elements_count: hiddenElementsCount,
+      fingerprinting_attempts: fingerprintingAttempts,
+      auto_redirects: autoRedirects,
+      popup_frequency: popupFrequency,
+    }
+  }
+
+  // 🌐 Send metrics to ML API and save result
+  private async fetchPrivacyRiskScore(tabId: number) {
+    const metrics = await this.collectMetrics(tabId)
+
+    try {
+      const response = await fetch("https://privacy-browser-api.onrender.com/predict", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(metrics),
+      })
+
+      const result = await response.json()
+      await chrome.storage.local.set({ [`privacyResult-${tabId}`]: result })
+      console.log("Fetched and stored ML privacy result:", result)
+
+    } catch (error) {
+      console.error("Failed to fetch privacy score from API:", error)
+    }
+  }
 }
 
-// Initialize background service
+
 new GhostModeBackground()

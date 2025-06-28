@@ -10,9 +10,16 @@ interface PrivacyDashboardProps {
   trackerData: TrackerData[]
   isEnabled: boolean
   onToggle: (enabled: boolean) => void
+  apiResult: any | null
 }
 
-const PrivacyDashboard: React.FC<PrivacyDashboardProps> = ({ privacyScore, trackerData, isEnabled, onToggle }) => {
+const PrivacyDashboard: React.FC<PrivacyDashboardProps> = ({
+  privacyScore,
+  trackerData,
+  isEnabled,
+  onToggle,
+  apiResult,
+}) => {
   const totalRevenueSaved = trackerData.reduce((sum, tracker) => sum + tracker.estimatedRevenue, 0)
   const recentTrackers = trackerData.slice(-5)
 
@@ -54,7 +61,60 @@ const PrivacyDashboard: React.FC<PrivacyDashboardProps> = ({ privacyScore, track
         </CardContent>
       </Card>
 
-      {/* ML Detection Stats */}
+      {/* ML Risk Analysis Card */}
+      {apiResult && (
+        <Card>
+          <CardHeader className="pb-3">
+            <div className="flex items-center gap-2">
+              <Brain className="h-5 w-5 text-indigo-600" />
+              <CardTitle className="text-base">ML Risk Prediction</CardTitle>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-2 text-sm">
+              <div className="flex justify-between">
+                <span>Risk Score</span>
+                <Badge variant="outline">{apiResult.privacy_risk_score.toFixed(2)} / 100</Badge>
+              </div>
+              <div className="flex justify-between">
+                <span>Malicious Probability</span>
+                <Badge variant="outline">{(apiResult.malicious_probability * 100).toFixed(1)}%</Badge>
+              </div>
+              <div className="flex justify-between">
+                <span>Confidence Level</span>
+                <Badge variant="outline">{(apiResult.confidence_level * 100).toFixed(1)}%</Badge>
+              </div>
+              <div className="flex justify-between">
+                <span>Tracking Intensity</span>
+                <Badge
+                  variant="outline"
+                  className={
+                    apiResult.tracking_intensity === "high"
+                      ? "text-red-600 bg-red-50"
+                      : apiResult.tracking_intensity === "medium"
+                      ? "text-yellow-600 bg-yellow-50"
+                      : "text-green-600 bg-green-50"
+                  }
+                >
+                  {apiResult.tracking_intensity}
+                </Badge>
+              </div>
+              <div>
+                <span className="block text-gray-600 mb-1">Primary Threats</span>
+                <div className="flex flex-wrap gap-1">
+                  {apiResult.primary_threats.map((threat: string, i: number) => (
+                    <Badge key={i} variant="outline" className="capitalize text-xs">
+                      {threat}
+                    </Badge>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* AI Detection Stats */}
       <Card>
         <CardHeader className="pb-3">
           <div className="flex items-center gap-2">

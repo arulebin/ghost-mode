@@ -20,49 +20,33 @@ function App() {
   })
 
   const [trackerData, setTrackerData] = useState<TrackerData[]>([])
+  const [apiResult, setApiResult] = useState<any>(null)
   const [isEnabled, setIsEnabled] = useState(true)
   const [currentTab, setCurrentTab] = useState("dashboard")
 
   useEffect(() => {
     loadPrivacyData()
-
-    // Update data every 5 seconds
     const interval = setInterval(loadPrivacyData, 5000)
     return () => clearInterval(interval)
   }, [])
 
   const loadPrivacyData = async () => {
     try {
-      // Check if chrome extension APIs are available
       if (typeof window.chrome !== "undefined" && window.chrome.tabs && window.chrome.runtime) {
-        // Get current tab
         const [tab] = await window.chrome.tabs.query({ active: true, currentWindow: true })
-
-        if (tab.id) {
-          // Get privacy score
-          const score = await window.chrome.runtime.sendMessage({
-            type: "GET_PRIVACY_SCORE",
-            tabId: tab.id,
+        if (tab?.id) {
+          const score = await window.chrome.runtime.sendMessage({ type: "GET_PRIVACY_SCORE", tabId: tab.id })
+          const trackers = await window.chrome.runtime.sendMessage({ type: "GET_TRACKER_DATA", tabId: tab.id })
+          chrome.storage.local.get(`privacyResult-${tab.id}`, (data) => {
+            const result = data[`privacyResult-${tab.id}`]
+            if (result) setApiResult(result)
           })
-
-          // Get tracker data
-          const trackers = await window.chrome.runtime.sendMessage({
-            type: "GET_TRACKER_DATA",
-            tabId: tab.id,
-          })
-
           setPrivacyScore(score || privacyScore)
           setTrackerData(trackers || [])
         }
       } else {
-        // Fallback for development/preview mode
-        console.log("Chrome extension APIs not available - using mock data")
-        setPrivacyScore({
-          score: 85,
-          trackersBlocked: 12,
-          fingerprintingAttempts: 3,
-          dataPointsProtected: 45,
-        })
+        console.log("Chrome APIs not available - using mock data")
+        setPrivacyScore({ score: 85, trackersBlocked: 12, fingerprintingAttempts: 3, dataPointsProtected: 45 })
         setTrackerData([
           {
             domain: "google-analytics.com",
@@ -81,6 +65,13 @@ function App() {
             estimatedRevenue: 0.12,
           },
         ])
+        setApiResult({
+          privacy_risk_score: 68.32,
+          malicious_probability: 0.63,
+          confidence_level: 0.87,
+          tracking_intensity: "medium",
+          primary_threats: ["tracking", "malware"],
+        })
       }
     } catch (error) {
       console.error("Failed to load privacy data:", error)
@@ -140,6 +131,7 @@ function App() {
             <PrivacyDashboard
               privacyScore={privacyScore}
               trackerData={trackerData}
+              apiResult={apiResult}
               isEnabled={isEnabled}
               onToggle={setIsEnabled}
             />

@@ -16707,7 +16707,13 @@ function Switch({
     }
   );
 }
-const PrivacyDashboard = ({ privacyScore, trackerData, isEnabled, onToggle }) => {
+const PrivacyDashboard = ({
+  privacyScore,
+  trackerData,
+  isEnabled,
+  onToggle,
+  apiResult
+}) => {
   const totalRevenueSaved = trackerData.reduce((sum, tracker) => sum + tracker.estimatedRevenue, 0);
   const recentTrackers = trackerData.slice(-5);
   const getRiskColor = (level) => {
@@ -16737,6 +16743,50 @@ const PrivacyDashboard = ({ privacyScore, trackerData, isEnabled, onToggle }) =>
         /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { children: [
           /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "text-2xl font-bold text-blue-600", children: privacyScore.dataPointsProtected }),
           /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "text-gray-600", children: "Data Points Protected" })
+        ] })
+      ] }) })
+    ] }),
+    apiResult && /* @__PURE__ */ jsxRuntimeExports.jsxs(Card, { children: [
+      /* @__PURE__ */ jsxRuntimeExports.jsx(CardHeader, { className: "pb-3", children: /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex items-center gap-2", children: [
+        /* @__PURE__ */ jsxRuntimeExports.jsx(Brain, { className: "h-5 w-5 text-indigo-600" }),
+        /* @__PURE__ */ jsxRuntimeExports.jsx(CardTitle, { className: "text-base", children: "ML Risk Prediction" })
+      ] }) }),
+      /* @__PURE__ */ jsxRuntimeExports.jsx(CardContent, { children: /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "space-y-2 text-sm", children: [
+        /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex justify-between", children: [
+          /* @__PURE__ */ jsxRuntimeExports.jsx("span", { children: "Risk Score" }),
+          /* @__PURE__ */ jsxRuntimeExports.jsxs(Badge, { variant: "outline", children: [
+            apiResult.privacy_risk_score.toFixed(2),
+            " / 100"
+          ] })
+        ] }),
+        /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex justify-between", children: [
+          /* @__PURE__ */ jsxRuntimeExports.jsx("span", { children: "Malicious Probability" }),
+          /* @__PURE__ */ jsxRuntimeExports.jsxs(Badge, { variant: "outline", children: [
+            (apiResult.malicious_probability * 100).toFixed(1),
+            "%"
+          ] })
+        ] }),
+        /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex justify-between", children: [
+          /* @__PURE__ */ jsxRuntimeExports.jsx("span", { children: "Confidence Level" }),
+          /* @__PURE__ */ jsxRuntimeExports.jsxs(Badge, { variant: "outline", children: [
+            (apiResult.confidence_level * 100).toFixed(1),
+            "%"
+          ] })
+        ] }),
+        /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex justify-between", children: [
+          /* @__PURE__ */ jsxRuntimeExports.jsx("span", { children: "Tracking Intensity" }),
+          /* @__PURE__ */ jsxRuntimeExports.jsx(
+            Badge,
+            {
+              variant: "outline",
+              className: apiResult.tracking_intensity === "high" ? "text-red-600 bg-red-50" : apiResult.tracking_intensity === "medium" ? "text-yellow-600 bg-yellow-50" : "text-green-600 bg-green-50",
+              children: apiResult.tracking_intensity
+            }
+          )
+        ] }),
+        /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { children: [
+          /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "block text-gray-600 mb-1", children: "Primary Threats" }),
+          /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "flex flex-wrap gap-1", children: apiResult.primary_threats.map((threat, i) => /* @__PURE__ */ jsxRuntimeExports.jsx(Badge, { variant: "outline", className: "capitalize text-xs", children: threat }, i)) })
         ] })
       ] }) })
     ] }),
@@ -20813,6 +20863,7 @@ function App() {
     dataPointsProtected: 0
   });
   const [trackerData, setTrackerData] = reactExports.useState([]);
+  const [apiResult, setApiResult] = reactExports.useState(null);
   const [isEnabled, setIsEnabled] = reactExports.useState(true);
   const [currentTab, setCurrentTab] = reactExports.useState("dashboard");
   reactExports.useEffect(() => {
@@ -20824,26 +20875,19 @@ function App() {
     try {
       if (typeof window.chrome !== "undefined" && window.chrome.tabs && window.chrome.runtime) {
         const [tab] = await window.chrome.tabs.query({ active: true, currentWindow: true });
-        if (tab.id) {
-          const score = await window.chrome.runtime.sendMessage({
-            type: "GET_PRIVACY_SCORE",
-            tabId: tab.id
-          });
-          const trackers = await window.chrome.runtime.sendMessage({
-            type: "GET_TRACKER_DATA",
-            tabId: tab.id
+        if (tab?.id) {
+          const score = await window.chrome.runtime.sendMessage({ type: "GET_PRIVACY_SCORE", tabId: tab.id });
+          const trackers = await window.chrome.runtime.sendMessage({ type: "GET_TRACKER_DATA", tabId: tab.id });
+          chrome.storage.local.get(`privacyResult-${tab.id}`, (data) => {
+            const result = data[`privacyResult-${tab.id}`];
+            if (result) setApiResult(result);
           });
           setPrivacyScore(score || privacyScore);
           setTrackerData(trackers || []);
         }
       } else {
-        console.log("Chrome extension APIs not available - using mock data");
-        setPrivacyScore({
-          score: 85,
-          trackersBlocked: 12,
-          fingerprintingAttempts: 3,
-          dataPointsProtected: 45
-        });
+        console.log("Chrome APIs not available - using mock data");
+        setPrivacyScore({ score: 85, trackersBlocked: 12, fingerprintingAttempts: 3, dataPointsProtected: 45 });
         setTrackerData([
           {
             domain: "google-analytics.com",
@@ -20862,6 +20906,13 @@ function App() {
             estimatedRevenue: 0.12
           }
         ]);
+        setApiResult({
+          privacy_risk_score: 68.32,
+          malicious_probability: 0.63,
+          confidence_level: 0.87,
+          tracking_intensity: "medium",
+          primary_threats: ["tracking", "malware"]
+        });
       }
     } catch (error) {
       console.error("Failed to load privacy data:", error);
@@ -20920,6 +20971,7 @@ function App() {
           {
             privacyScore,
             trackerData,
+            apiResult,
             isEnabled,
             onToggle: setIsEnabled
           }
