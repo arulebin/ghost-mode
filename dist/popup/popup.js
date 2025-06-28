@@ -20872,7 +20872,7 @@ function App() {
     if (score > 50) return "secondary";
     return "destructive";
   };
-  return /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "w-96 h-[600px] bg-background", children: [
+  return /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "w-96 max-h-screen bg-background overflow-auto", children: [
     /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "p-4 border-b bg-gradient-to-r from-purple-600 to-blue-600 text-white", children: [
       /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex items-center justify-between", children: [
         /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex items-center gap-2", children: [

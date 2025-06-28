@@ -94,7 +94,7 @@ function App() {
   }
 
   return (
-    <div className="w-96 h-[600px] bg-background">
+    <div className="w-96 max-h-screen bg-background overflow-auto">
       <div className="p-4 border-b bg-gradient-to-r from-purple-600 to-blue-600 text-white">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
