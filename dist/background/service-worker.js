@@ -28,8 +28,9 @@ class GhostModeBackground {
     chrome.webRequest.onBeforeRequest.addListener(this.analyzeRequest.bind(this), { urls: ["<all_urls>"] }, [
       "requestBody"
     ]);
-    chrome.tabs.onActivated.addListener(({ tabId }) => {
+    chrome.tabs.onActivated.addListener(async ({ tabId }) => {
       this.updateBadge(tabId);
+      this.fetchPrivacyRiskScore(tabId);
     });
   }
   async loadMLModels() {
@@ -158,6 +159,51 @@ class GhostModeBackground {
   }
   async updateSettings(settings) {
     await chrome.storage.sync.set({ ghostModeSettings: settings });
+  }
+  // 🔍 Collect metrics for ML API
+  async collectMetrics(tabId) {
+    const trackers = this.getTrackerData(tabId);
+    const fingerprintingAttempts = trackers.filter((t) => t.type === "fingerprint").length;
+    const popupFrequency = trackers.filter((t) => t.type === "popup").length;
+    const encryptedRequestsRatio = 0.75;
+    const externalScriptLoads = 3;
+    const thirdPartyRequests = 10;
+    const hiddenElementsCount = 2;
+    const autoRedirects = 1;
+    const evalUsageCount = 1;
+    const suspiciousApiCalls = 2;
+    const obfuscatedCodePercentage = 45.7;
+    const dataSentSizeKb = 180.5;
+    return {
+      obfuscated_code_percentage: obfuscatedCodePercentage,
+      suspicious_api_calls: suspiciousApiCalls,
+      eval_usage_count: evalUsageCount,
+      external_script_loads: externalScriptLoads,
+      third_party_requests: thirdPartyRequests,
+      tracking_domains_count: new Set(trackers.map((t) => t.domain)).size,
+      data_sent_size_kb: dataSentSizeKb,
+      encrypted_requests_ratio: encryptedRequestsRatio,
+      hidden_elements_count: hiddenElementsCount,
+      fingerprinting_attempts: fingerprintingAttempts,
+      auto_redirects: autoRedirects,
+      popup_frequency: popupFrequency
+    };
+  }
+  // 🌐 Send metrics to ML API and save result
+  async fetchPrivacyRiskScore(tabId) {
+    const metrics = await this.collectMetrics(tabId);
+    try {
+      const response = await fetch("https://privacy-browser-api.onrender.com/predict", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(metrics)
+      });
+      const result = await response.json();
+      await chrome.storage.local.set({ [`privacyResult-${tabId}`]: result });
+      console.log("Fetched and stored ML privacy result:", result);
+    } catch (error) {
+      console.error("Failed to fetch privacy score from API:", error);
+    }
   }
 }
 new GhostModeBackground();
