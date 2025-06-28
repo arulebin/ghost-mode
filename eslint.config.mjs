@@ -11,6 +11,26 @@ const compat = new FlatCompat({
 
 const eslintConfig = [
   ...compat.extends("next/core-web-vitals", "next/typescript"),
+  ...compat.config({
+    rules: {
+      "no-console": "warn",
+      "no-unused-vars": ["warn", { argsIgnorePattern: "^_" }],
+      "react/react-in-jsx-scope": "off", // Next.js handles React import
+      "@next/next/no-img-element": "off", // Allow <img> elements
+    },
+  }),
+  {
+    files: ["**/*.ts", "**/*.tsx"],
+    rules: {
+      "@typescript-eslint/no-unused-vars": ["warn", { argsIgnorePattern: "^_" }],
+    },
+  },
+  {
+    files: ["**/*.js", "**/*.jsx"],
+    rules: {
+      "no-unused-vars": ["warn", { argsIgnorePattern: "^_" }],
+    },
+  },
 ];
 
 export default eslintConfig;
